@@ -60,12 +60,12 @@
 
     const rows = items.map((item) => {
       const comment = item.annotation
-        ? `<div class="sharegpt-annotation-comment"><div class="sharegpt-annotation-label">${exporter.escapeHtml(annotationLabel)}</div><div>${exporter.escapeHtml(item.annotation)}</div></div>`
+        ? `<div style="margin-top:8px"><div style="margin-bottom:2px;font-size:11px;font-weight:650;opacity:.62">${exporter.escapeHtml(annotationLabel)}</div><div style="white-space:pre-wrap;overflow-wrap:anywhere">${exporter.escapeHtml(item.annotation)}</div></div>`
         : "";
-      return `<div class="sharegpt-annotation-item"><div class="sharegpt-annotation-index">${item.index}.</div><div class="sharegpt-annotation-body"><div class="sharegpt-annotation-label">${exporter.escapeHtml(selectedLabel)}</div><div class="sharegpt-annotation-quote">${exporter.escapeHtml(item.selectedText)}</div>${comment}</div></div>`;
+      return `<div style="display:grid;grid-template-columns:22px minmax(0,1fr);gap:8px;padding:10px 2px;border-top:1px solid var(--border)"><div style="padding-top:1px;text-align:right;font-size:11px;opacity:.55">${item.index}.</div><div style="min-width:0"><div style="margin-bottom:2px;font-size:11px;font-weight:650;opacity:.62">${exporter.escapeHtml(selectedLabel)}</div><div style="white-space:pre-wrap;overflow-wrap:anywhere">${exporter.escapeHtml(item.selectedText)}</div>${comment}</div></div>`;
     }).join("");
 
-    return `<aside class="sharegpt-annotations" aria-label="${exporter.escapeHtml(heading)}"><div class="sharegpt-annotations-heading">${exporter.escapeHtml(heading)}</div>${rows}</aside>`;
+    return `<aside aria-label="${exporter.escapeHtml(heading)}" style="margin-top:12px;padding:10px 12px;border:1px solid var(--border);border-radius:12px;background:var(--code);font-size:13px;line-height:1.45"><div style="padding:0 2px 7px;font-size:12px;font-weight:700;opacity:.78">${exporter.escapeHtml(heading)}</div>${rows}</aside>`;
   }
 
   function annotationMarkdown(items, language) {
