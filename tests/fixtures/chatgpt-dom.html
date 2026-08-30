@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="en">
+  <body>
+    <div id="conversation-header-actions">
+      <button data-testid="share-chat-button" aria-label="Share chat"></button>
+      <button data-testid="conversation-options-button" aria-label="Conversation options"></button>
+    </div>
+
+    <main>
+      <article
+        data-testid="conversation-turn-0"
+        data-message-author-role="user"
+        data-message-id="fixture-user"
+      >
+        <div class="whitespace-pre-wrap">A fixture prompt.</div>
+        <button data-testid="copy-turn-action-button" aria-label="Copy message"></button>
+        <button data-testid="share-prompt-link-turn-action-button" aria-label="Share message"></button>
+      </article>
+
+      <article
+        data-testid="conversation-turn-1"
+        data-message-author-role="assistant"
+        data-message-id="fixture-assistant"
+      >
+        <div class="markdown">
+          <p>A fixture response.</p>
+          <pre><code><span class="cm-line">const answer = 42;</span></code></pre>
+        </div>
+        <button data-testid="copy-turn-action-button" aria-label="Copy response"></button>
+      </article>
+    </main>
+  </body>
+</html>

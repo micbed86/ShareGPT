@@ -1,0 +1,333 @@
+:root {
+  --sgpt-surface: #ffffff;
+  --sgpt-surface-muted: #f5f5f5;
+  --sgpt-text: #171717;
+  --sgpt-muted: #666666;
+  --sgpt-border: #dedede;
+  --sgpt-accent: #171717;
+  --sgpt-accent-text: #ffffff;
+  --sgpt-danger-surface: #fff4f2;
+  --sgpt-danger-border: #edc3bb;
+  --sgpt-danger-text: #712b22;
+}
+
+html.dark,
+html[data-theme="dark"] {
+  --sgpt-surface: #262626;
+  --sgpt-surface-muted: #303030;
+  --sgpt-text: #f1f1f1;
+  --sgpt-muted: #b7b7b7;
+  --sgpt-border: #494949;
+  --sgpt-accent: #f1f1f1;
+  --sgpt-accent-text: #171717;
+  --sgpt-danger-surface: #3a2725;
+  --sgpt-danger-border: #70443f;
+  --sgpt-danger-text: #ffd3cc;
+}
+
+.sgpt-global-action,
+.sgpt-turn-action,
+.sgpt-menu,
+.sgpt-dialog-backdrop,
+.sgpt-toast {
+  font-family: ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif !important;
+  font-size: 14px !important;
+  line-height: 1.35 !important;
+}
+
+.sgpt-global-action {
+  display: inline-flex !important;
+  align-items: center !important;
+  margin-left: auto !important;
+  padding: 0 8px !important;
+  flex: 0 0 auto !important;
+  z-index: 12 !important;
+}
+
+.sgpt-global-action[data-sharegpt-native-actions] {
+  margin-left: 4px !important;
+  padding: 0 !important;
+}
+
+body > .sgpt-global-action {
+  position: fixed !important;
+  top: 9px !important;
+  right: 72px !important;
+}
+
+.sgpt-global-button,
+.sgpt-turn-button {
+  appearance: none !important;
+  border: 1px solid var(--sgpt-border) !important;
+  color: var(--sgpt-text) !important;
+  background: var(--sgpt-surface) !important;
+  box-shadow: none !important;
+  cursor: pointer !important;
+  font: inherit !important;
+}
+
+.sgpt-global-button {
+  min-height: 34px !important;
+  padding: 6px 12px !important;
+  border-radius: 10px !important;
+  font-size: 13px !important;
+  font-weight: 550 !important;
+  white-space: nowrap !important;
+}
+
+.sgpt-global-label-mobile {
+  display: none !important;
+}
+
+.sgpt-global-button:hover,
+.sgpt-turn-button:hover,
+.sgpt-dialog-button:hover,
+.sgpt-menu-item:hover {
+  background: var(--sgpt-surface-muted) !important;
+}
+
+.sgpt-global-button:focus-visible,
+.sgpt-turn-button:focus-visible,
+.sgpt-dialog-button:focus-visible,
+.sgpt-menu-item:focus-visible,
+.sgpt-link-input:focus-visible,
+.sgpt-dialog-button[href]:focus-visible {
+  outline: 2px solid #2f76d2 !important;
+  outline-offset: 2px !important;
+}
+
+.sgpt-global-button:disabled {
+  cursor: default !important;
+  opacity: .42 !important;
+}
+
+.sgpt-turn-action {
+  display: inline-flex !important;
+  align-items: center !important;
+  margin-left: 2px !important;
+  vertical-align: middle !important;
+}
+
+article > .sgpt-turn-action,
+[data-testid^="conversation-turn-"] > .sgpt-turn-action {
+  display: flex !important;
+  width: min(100%, 48rem) !important;
+  margin: 8px auto 0 !important;
+  justify-content: flex-start !important;
+}
+
+.sgpt-turn-button {
+  display: inline-grid !important;
+  width: 30px !important;
+  height: 30px !important;
+  padding: 0 !important;
+  place-items: center !important;
+  border-color: transparent !important;
+  border-radius: 8px !important;
+  font-family: Arial, sans-serif !important;
+  font-size: 9px !important;
+  font-weight: 700 !important;
+  letter-spacing: 1px !important;
+}
+
+.sgpt-menu {
+  position: fixed !important;
+  z-index: 2147483645 !important;
+  display: grid !important;
+  width: min(270px, calc(100vw - 16px)) !important;
+  padding: 5px !important;
+  border: 1px solid var(--sgpt-border) !important;
+  border-radius: 12px !important;
+  background: var(--sgpt-surface) !important;
+  color: var(--sgpt-text) !important;
+  box-shadow: 0 12px 30px rgb(0 0 0 / .16) !important;
+}
+
+.sgpt-menu-item {
+  appearance: none !important;
+  width: 100% !important;
+  min-height: 38px !important;
+  padding: 8px 10px !important;
+  border: 0 !important;
+  border-radius: 8px !important;
+  background: var(--sgpt-surface) !important;
+  color: var(--sgpt-text) !important;
+  cursor: pointer !important;
+  font: inherit !important;
+  text-align: left !important;
+}
+
+.sgpt-dialog-backdrop {
+  position: fixed !important;
+  inset: 0 !important;
+  z-index: 2147483646 !important;
+  display: grid !important;
+  place-items: center !important;
+  padding: 20px !important;
+  background: rgb(0 0 0 / .48) !important;
+}
+
+.sgpt-dialog {
+  width: min(100%, 480px) !important;
+  max-height: min(680px, calc(100dvh - 40px)) !important;
+  overflow: auto !important;
+  border: 1px solid var(--sgpt-border) !important;
+  border-radius: 16px !important;
+  background: var(--sgpt-surface) !important;
+  color: var(--sgpt-text) !important;
+  box-shadow: 0 24px 70px rgb(0 0 0 / .28) !important;
+  padding: 22px !important;
+}
+
+.sgpt-dialog-title {
+  margin: 0 0 10px !important;
+  color: var(--sgpt-text) !important;
+  font: 650 19px/1.3 ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif !important;
+  letter-spacing: -.015em !important;
+}
+
+.sgpt-dialog-body {
+  color: var(--sgpt-text) !important;
+}
+
+.sgpt-dialog-copy,
+.sgpt-privacy-note {
+  margin: 0 0 14px !important;
+  font-size: 14px !important;
+  line-height: 1.55 !important;
+}
+
+.sgpt-dialog-copy {
+  color: var(--sgpt-muted) !important;
+}
+
+.sgpt-privacy-note {
+  padding: 11px 12px !important;
+  border: 1px solid var(--sgpt-danger-border) !important;
+  border-radius: 10px !important;
+  background: var(--sgpt-danger-surface) !important;
+  color: var(--sgpt-danger-text) !important;
+}
+
+.sgpt-dialog-actions {
+  display: flex !important;
+  flex-wrap: wrap !important;
+  justify-content: flex-end !important;
+  gap: 8px !important;
+  margin-top: 18px !important;
+}
+
+.sgpt-dialog-button {
+  appearance: none !important;
+  display: inline-flex !important;
+  min-height: 38px !important;
+  align-items: center !important;
+  justify-content: center !important;
+  padding: 8px 13px !important;
+  border: 1px solid var(--sgpt-border) !important;
+  border-radius: 10px !important;
+  background: var(--sgpt-surface) !important;
+  color: var(--sgpt-text) !important;
+  cursor: pointer !important;
+  font: 550 14px/1.2 ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif !important;
+  text-decoration: none !important;
+  white-space: nowrap !important;
+}
+
+.sgpt-dialog-button-primary,
+.sgpt-dialog-button-primary:hover {
+  border-color: var(--sgpt-accent) !important;
+  background: var(--sgpt-accent) !important;
+  color: var(--sgpt-accent-text) !important;
+}
+
+.sgpt-dialog-button:disabled {
+  cursor: wait !important;
+  opacity: .6 !important;
+}
+
+.sgpt-link-box {
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr) auto !important;
+  gap: 8px !important;
+}
+
+.sgpt-link-input {
+  min-width: 0 !important;
+  height: 40px !important;
+  border: 1px solid var(--sgpt-border) !important;
+  border-radius: 10px !important;
+  background: var(--sgpt-surface-muted) !important;
+  color: var(--sgpt-text) !important;
+  padding: 8px 10px !important;
+  font: 13px/1.2 ui-monospace, SFMono-Regular, Consolas, monospace !important;
+}
+
+.sgpt-toast {
+  position: fixed !important;
+  left: 50% !important;
+  bottom: max(24px, env(safe-area-inset-bottom)) !important;
+  z-index: 2147483647 !important;
+  max-width: min(380px, calc(100vw - 32px)) !important;
+  transform: translateX(-50%) !important;
+  border: 1px solid var(--sgpt-border) !important;
+  border-radius: 10px !important;
+  background: var(--sgpt-surface) !important;
+  color: var(--sgpt-text) !important;
+  box-shadow: 0 12px 30px rgb(0 0 0 / .18) !important;
+  padding: 10px 14px !important;
+  font-size: 13px !important;
+}
+
+.sgpt-copy-fallback {
+  position: fixed !important;
+  left: -9999px !important;
+  top: 0 !important;
+}
+
+@media (max-width: 640px) {
+  .sgpt-global-action {
+    padding: 0 4px !important;
+  }
+
+  body > .sgpt-global-action {
+    right: 54px !important;
+  }
+
+  .sgpt-global-button {
+    padding-inline: 9px !important;
+  }
+
+  .sgpt-global-label {
+    display: none !important;
+  }
+
+  .sgpt-global-label-mobile {
+    display: inline !important;
+  }
+
+  .sgpt-dialog-backdrop {
+    align-items: end !important;
+    padding: 10px !important;
+  }
+
+  .sgpt-dialog {
+    width: 100% !important;
+    max-height: calc(100dvh - 20px) !important;
+    border-radius: 16px !important;
+    padding: 18px !important;
+  }
+
+  .sgpt-link-box {
+    grid-template-columns: minmax(0, 1fr) !important;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sgpt-menu,
+  .sgpt-dialog,
+  .sgpt-toast {
+    animation: none !important;
+    transition: none !important;
+  }
+}
