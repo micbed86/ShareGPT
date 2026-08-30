@@ -24,6 +24,7 @@
       ],
       "js": [
         "src/exporter.js",
+        "src/annotations-compat.js",
         "src/content.js"
       ],
       "css": [
