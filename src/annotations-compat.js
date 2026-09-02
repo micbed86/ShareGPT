@@ -12,7 +12,7 @@
   const COMMENT_SELECTOR = ".cga-sent-receipt__comment";
 
   function cleanText(value) {
-    return String(value || "").replace(/\u200b/g, "").trim();
+    return String(value || "").replace(/\u200b/g, "").replace(/\r\n?/g, "\n").trim();
   }
 
   function readItems(receipt) {
@@ -24,31 +24,78 @@
     })).filter((item) => item.selectedText || item.annotation);
   }
 
+  function receiptsIn(doc) {
+    return doc?.querySelectorAll ? [...doc.querySelectorAll(RECEIPT_SELECTOR)] : [];
+  }
+
+  function receiptLocator(receipt, doc) {
+    const message = receipt?.closest?.("[data-message-id]");
+    const turn = receipt?.closest?.("[data-testid^='conversation-turn-']");
+    return {
+      messageId: message?.getAttribute("data-message-id") || "",
+      turnId: turn?.getAttribute("data-testid") || "",
+      index: receiptsIn(doc).indexOf(receipt),
+      receipt
+    };
+  }
+
+  function findOpenReceipt(doc) {
+    return receiptsIn(doc).find((receipt) => receipt.querySelector(PANEL_SELECTOR)) || null;
+  }
+
+  function saveReceiptState(doc) {
+    const openReceipt = findOpenReceipt(doc);
+    return openReceipt ? receiptLocator(openReceipt, doc) : null;
+  }
+
+  function findReceipt(doc, locator) {
+    if (!locator) return null;
+    const receipts = receiptsIn(doc);
+    const byMessage = locator.messageId
+      ? receipts.find((receipt) => receipt.closest?.("[data-message-id]")?.getAttribute("data-message-id") === locator.messageId)
+      : null;
+    if (byMessage) return byMessage;
+
+    const byTurn = locator.turnId
+      ? receipts.find((receipt) => receipt.closest?.("[data-testid^='conversation-turn-']")?.getAttribute("data-testid") === locator.turnId)
+      : null;
+    if (byTurn) return byTurn;
+
+    if (locator.receipt && (locator.receipt.isConnected === true || doc?.contains?.(locator.receipt))) return locator.receipt;
+    return locator.index >= 0 ? receipts[locator.index] || null : null;
+  }
+
+  function toggleReceipt(receipt) {
+    const toggle = receipt?.querySelector?.(TOGGLE_SELECTOR);
+    if (toggle) toggle.click();
+  }
+
+  function restoreReceiptState(doc, originalOpen) {
+    const currentOpen = findOpenReceipt(doc);
+    if (!originalOpen) {
+      if (currentOpen) toggleReceipt(currentOpen);
+      return;
+    }
+
+    const target = findReceipt(doc, originalOpen);
+    if (!target || target.querySelector(PANEL_SELECTOR)) return;
+    toggleReceipt(target);
+  }
+
   function collectAnnotations(turn) {
     let receipt = turn?.querySelector?.(RECEIPT_SELECTOR);
     if (!receipt) return [];
 
-    const initiallyExpanded = Boolean(receipt.querySelector(PANEL_SELECTOR));
-    let openedForRead = false;
-
-    if (!initiallyExpanded) {
+    if (!receipt.querySelector(PANEL_SELECTOR)) {
       const toggle = receipt.querySelector(TOGGLE_SELECTOR);
       if (toggle) {
+        const locator = receiptLocator(receipt, turn.ownerDocument);
         toggle.click();
-        openedForRead = true;
-        receipt = turn.querySelector(RECEIPT_SELECTOR) || receipt;
+        receipt = findReceipt(turn.ownerDocument, locator) || turn.querySelector(RECEIPT_SELECTOR) || receipt;
       }
     }
 
-    const items = readItems(receipt);
-
-    if (openedForRead) {
-      const currentReceipt = turn.querySelector(RECEIPT_SELECTOR);
-      const toggle = currentReceipt?.querySelector(TOGGLE_SELECTOR);
-      if (currentReceipt?.querySelector(PANEL_SELECTOR) && toggle) toggle.click();
-    }
-
-    return items;
+    return readItems(receipt);
   }
 
   function annotationHtml(items, language) {
@@ -76,7 +123,10 @@
     const annotationLabel = polish ? "Adnotacja" : "Annotation";
     const blocks = items.map((item) => {
       const lines = [`${item.index}. **${selectedLabel}:**`, `   > ${item.selectedText.replace(/\n/g, "\n   > ")}`];
-      if (item.annotation) lines.push(`   **${annotationLabel}:** ${item.annotation}`);
+      if (item.annotation) {
+        const comment = item.annotation.replace(/\n/g, "\n   ");
+        lines.push(`   **${annotationLabel}:** ${comment}`);
+      }
       return lines.join("\n");
     });
     return `### ${heading}\n\n${blocks.join("\n\n")}`;
@@ -84,24 +134,29 @@
 
   const baseCapture = exporter.capture.bind(exporter);
   exporter.capture = async function captureWithAnnotations(doc, options = {}) {
-    const entries = exporter.findTurns(doc);
-    const selected = options.turn
-      ? entries.filter((entry) => entry.turn === options.turn || options.turn.contains(entry.roleNode))
-      : entries;
-    const annotationsByIndex = selected.map((entry) => collectAnnotations(entry.turn));
-    const snapshot = await baseCapture(doc, options);
+    const originalOpen = saveReceiptState(doc);
+    try {
+      const entries = exporter.findTurns(doc);
+      const selected = options.turn
+        ? entries.filter((entry) => entry.turn === options.turn || options.turn.contains(entry.roleNode))
+        : entries;
+      const annotationsByIndex = selected.map((entry) => collectAnnotations(entry.turn));
+      const snapshot = await baseCapture(doc, options);
 
-    snapshot.messages = snapshot.messages.map((message, index) => {
-      const annotations = annotationsByIndex[index] || [];
-      if (!annotations.length) return message;
-      return {
-        ...message,
-        annotations,
-        html: `${message.html}${annotationHtml(annotations, snapshot.language)}`,
-        markdown: `${message.markdown}\n\n${annotationMarkdown(annotations, snapshot.language)}`
-      };
-    });
-    return snapshot;
+      snapshot.messages = snapshot.messages.map((message, index) => {
+        const annotations = annotationsByIndex[index] || [];
+        if (!annotations.length) return message;
+        return {
+          ...message,
+          annotations,
+          html: `${message.html}${annotationHtml(annotations, snapshot.language)}`,
+          markdown: `${message.markdown}\n\n${annotationMarkdown(annotations, snapshot.language)}`
+        };
+      });
+      return snapshot;
+    } finally {
+      restoreReceiptState(doc, originalOpen);
+    }
   };
 
   exporter.__annotationsCompatibility = {

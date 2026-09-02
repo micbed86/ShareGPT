@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <title>Annotation capture fixture | ChatGPT</title>
+  </head>
+  <body>
+    <main>
+      <article data-testid="conversation-turn-0">
+        <div data-message-author-role="user" data-message-id="annotation-user-a">
+          <div class="whitespace-pre-wrap">Question A.</div>
+          <div class="cga-sent-receipt" data-cga-key="user-a" data-cga-selected="A selected text" data-cga-annotation="A comment">
+            <button class="cga-sent-receipt__toggle" aria-expanded="true">Annotations</button>
+            <div class="cga-sent-receipt__panel">
+              <div class="cga-sent-receipt__item">
+                <blockquote class="cga-sent-receipt__quote">A selected text</blockquote>
+                <div class="cga-sent-receipt__comment">A comment</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </article>
+
+      <article data-testid="conversation-turn-1">
+        <div data-message-author-role="user" data-message-id="annotation-user-b">
+          <div class="whitespace-pre-wrap">Question B.</div>
+          <div class="cga-sent-receipt" data-cga-key="user-b" data-cga-selected="B selected text" data-cga-annotation="B comment">
+            <button class="cga-sent-receipt__toggle" aria-expanded="false">Annotations</button>
+          </div>
+        </div>
+      </article>
+
+      <article data-testid="conversation-turn-2">
+        <div data-message-author-role="user" data-message-id="annotation-user-c">
+          <div class="whitespace-pre-wrap">Question C with attachment.</div>
+          <div data-testid="file-attachment"><a href="https://example.com/attachment.txt">attachment.txt</a></div>
+          <div class="cga-sent-receipt" data-cga-key="user-c" data-cga-selected="C selected text" data-cga-annotation="first annotation line
+second annotation line">
+            <button class="cga-sent-receipt__toggle" aria-expanded="false">Annotations</button>
+          </div>
+        </div>
+      </article>
+    </main>
+  </body>
+</html>

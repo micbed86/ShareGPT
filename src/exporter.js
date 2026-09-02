@@ -28,6 +28,7 @@
     "canvas",
     "video",
     "audio",
+    ".cga-sent-receipt",
     "[data-sharegpt-ui]"
   ].join(",");
 
@@ -254,6 +255,7 @@
     const element = node;
     const tag = element.tagName.toUpperCase();
     if (element.hasAttribute && element.hasAttribute("data-sharegpt-ui")) return "";
+    if (element.classList && element.classList.contains("cga-sent-receipt")) return "";
     if (["SCRIPT", "STYLE", "BUTTON", "SVG", "CANVAS", "VIDEO", "AUDIO"].includes(tag)) return "";
 
     if (element.classList && element.classList.contains("katex")) {
