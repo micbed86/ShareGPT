@@ -10,13 +10,14 @@ test("asset allowlist is limited to OpenAI and ChatGPT HTTPS hosts", () => {
   assert.equal(core.isAllowedAssetUrl("https://example.com/file.png"), false);
 });
 
-test("deploy response accepts only shipped.page HTTPS URLs", () => {
+test("deploy response accepts only shipped.run HTTPS URLs", () => {
   const normalized = core.normalizeDeployResponse({
-    url: "https://quiet-river-c0ffee.shipped.page/",
+    url: "https://quiet-river-c0ffee.shipped.run/",
     slug: "quiet-river-c0ffee",
     expires_at: "2026-08-27T00:00:00.000Z"
   });
-  assert.equal(normalized.url, "https://quiet-river-c0ffee.shipped.page/");
+  assert.equal(normalized.url, "https://quiet-river-c0ffee.shipped.run/");
+  assert.throws(() => core.normalizeDeployResponse({ url: "https://quiet-river-c0ffee.shipped.page/" }), /zaufanej domeny/);
   assert.throws(() => core.normalizeDeployResponse({ url: "https://evil.example/" }), /zaufanej domeny/);
   assert.throws(() => core.normalizeDeployResponse({}), /nie zwrócił adresu/);
 });
