@@ -4,7 +4,7 @@
   "private": true,
   "description": "Chromium MV3 extension for sharing and exporting ChatGPT conversations and messages.",
   "scripts": {
-    "check": "node --check src/background-core.js && node --check src/background.js && node --check src/exporter.js && node --check src/content.js && node --check tools/package.mjs && node --check tools/test-hosting.mjs && node tools/validate.mjs",
+    "check": "node --check src/background-core.js && node --check src/background.js && node --check src/exporter.js && node --check src/annotations-compat.js && node --check src/content.js && node --check tools/package.mjs && node --check tools/test-hosting.mjs && node tools/validate.mjs",
     "test": "node --test tests/*.test.js",
     "test:hosting": "node tools/test-hosting.mjs",
     "verify": "npm run check && npm test",
