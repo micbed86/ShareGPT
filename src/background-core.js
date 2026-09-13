@@ -11,6 +11,7 @@
   const MAX_IMAGE_BYTES = 8 * 1024 * 1024;
   const DEPLOY_HOST = "ship.page";
   const PUBLIC_HOST_SUFFIX = ".shipped.run";
+  const LEGACY_PUBLIC_HOST_SUFFIX = ".shipped.page";
 
   function byteLength(value) {
     return new TextEncoder().encode(String(value || "")).byteLength;
@@ -46,25 +47,47 @@
       || host.endsWith(".openai.com");
   }
 
-  function normalizeDeployResponse(payload) {
-    if (!payload || typeof payload.url !== "string") {
-      throw new Error("Serwer nie zwrócił adresu opublikowanej strony.");
-    }
+  function normalizeSlug(value) {
+    const slug = typeof value === "string" ? value.trim().toLowerCase() : "";
+    if (!slug || slug.length > 63) return "";
+    return /^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$/.test(slug) ? slug : "";
+  }
 
-    let publicUrl;
+  function slugFromPublicUrl(value) {
+    let url;
     try {
-      publicUrl = new URL(payload.url);
+      url = new URL(value);
     } catch (_error) {
-      throw new Error("Serwer zwrócił nieprawidłowy adres strony.");
+      return "";
+    }
+    if (url.protocol !== "https:") return "";
+
+    const host = url.hostname.toLowerCase();
+    for (const suffix of [PUBLIC_HOST_SUFFIX, LEGACY_PUBLIC_HOST_SUFFIX]) {
+      if (!host.endsWith(suffix)) continue;
+      return normalizeSlug(host.slice(0, -suffix.length));
+    }
+    return "";
+  }
+
+  function normalizeDeployResponse(payload) {
+    if (!payload || typeof payload !== "object") {
+      throw new Error("Serwer publikacji zwrócił nieprawidłową odpowiedź.");
     }
 
-    if (publicUrl.protocol !== "https:" || !publicUrl.hostname.endsWith(PUBLIC_HOST_SUFFIX)) {
-      throw new Error("Serwer zwrócił adres spoza zaufanej domeny shipped.run.");
+    // ship.page has changed its public serving domain before. The deployment
+    // response is trusted because it comes directly from https://ship.page;
+    // use the stable drop slug as the source of truth and construct the
+    // canonical public URL locally instead of coupling the extension to the
+    // hostname currently returned by the API.
+    const slug = normalizeSlug(payload.slug) || slugFromPublicUrl(payload.url);
+    if (!slug) {
+      throw new Error("Serwer nie zwrócił prawidłowego identyfikatora publikacji.");
     }
 
     return {
-      url: publicUrl.href,
-      slug: typeof payload.slug === "string" ? payload.slug : "",
+      url: `https://${slug}${PUBLIC_HOST_SUFFIX}/`,
+      slug,
       expiresAt: typeof payload.expires_at === "string" ? payload.expires_at : ""
     };
   }
