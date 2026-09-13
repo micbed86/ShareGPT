@@ -118,15 +118,46 @@
     return turns;
   }
 
+  function renderedImageSize(image) {
+    let rect = null;
+    try {
+      rect = typeof image.getBoundingClientRect === "function" ? image.getBoundingClientRect() : null;
+    } catch (_error) {
+      rect = null;
+    }
+    const attrWidth = Number.parseFloat(image.getAttribute && image.getAttribute("width")) || 0;
+    const attrHeight = Number.parseFloat(image.getAttribute && image.getAttribute("height")) || 0;
+    return {
+      width: Math.max(rect && Number.isFinite(rect.width) ? rect.width : 0, attrWidth),
+      height: Math.max(rect && Number.isFinite(rect.height) ? rect.height : 0, attrHeight)
+    };
+  }
+
+  function isLikelyConversationImage(image) {
+    if (!image || String(image.tagName || "").toUpperCase() !== "IMG") return false;
+    if (image.closest && image.closest("[data-testid*='attachment'], [data-testid*='file']")) return true;
+
+    const { width, height } = renderedImageSize(image);
+    if (width >= 96 || height >= 96) return true;
+
+    const alt = String(image.getAttribute && image.getAttribute("alt") || "").trim();
+    const insideExternalLink = !!(image.closest && image.closest("a[href^='http://'], a[href^='https://']"));
+    if (!insideExternalLink && /(?:uploaded|attachment|generated|photo|image|obraz|zdj[eę]cie|grafik)/i.test(alt)) return true;
+
+    return false;
+  }
+
   function contentForRole(roleNode) {
     const role = roleNode.getAttribute("data-message-author-role");
     if (role === "assistant") {
       const markdown = roleNode.querySelector(".markdown, [class*='markdown']");
-      const extraMedia = roleNode.querySelector("img, [data-testid*='file'], [data-testid*='attachment']");
+      const meaningfulImage = [...roleNode.querySelectorAll("img")].find((image) => isLikelyConversationImage(image));
+      const extraMedia = meaningfulImage || roleNode.querySelector("[data-testid*='file'], [data-testid*='attachment']");
       return markdown && extraMedia && !markdown.contains(extraMedia) ? roleNode : (markdown || roleNode);
     }
     const text = roleNode.querySelector("[class*='whitespace-pre-wrap'], .markdown, [class*='markdown']");
-    const extraMedia = roleNode.querySelector("img, [data-testid*='file'], [data-testid*='attachment']");
+    const meaningfulImage = [...roleNode.querySelectorAll("img")].find((image) => isLikelyConversationImage(image));
+    const extraMedia = meaningfulImage || roleNode.querySelector("[data-testid*='file'], [data-testid*='attachment']");
     return text && extraMedia && !text.contains(extraMedia) ? roleNode : (text || roleNode);
   }
 
@@ -136,7 +167,13 @@
   }
 
   function sanitizeClone(source) {
+    const sourceImages = source.tagName === "IMG" ? [source] : [...source.querySelectorAll("img")];
     const clone = source.cloneNode(true);
+    const cloneImages = clone.tagName === "IMG" ? [clone] : [...clone.querySelectorAll("img")];
+
+    for (let index = 0; index < cloneImages.length; index += 1) {
+      if (!isLikelyConversationImage(sourceImages[index])) cloneImages[index].remove();
+    }
 
     const preformattedBlocks = clone.tagName === "PRE" ? [clone] : [...clone.querySelectorAll("pre")];
     for (const pre of preformattedBlocks) {
@@ -419,13 +456,32 @@
     };
   }
 
+  function extractImagesFromHtml(html) {
+    const images = [];
+    let content = String(html || "").replace(/<img\b[^>]*>/gi, (image) => {
+      images.push(image);
+      return "";
+    });
+    content = content
+      .replace(/<a\b[^>]*>\s*<\/a>/gi, "")
+      .replace(/<(?:div|span|p)\b[^>]*>\s*<\/(?:div|span|p)>/gi, "")
+      .trim();
+    const textOnly = content.replace(/<[^>]+>/g, "").replace(/&nbsp;/gi, " ").trim();
+    if (!textOnly && !/<(?:pre|code|table|ul|ol|blockquote|details|hr)\b/i.test(content)) content = "";
+    return { content, media: images.join("") };
+  }
+
   function messageHtml(message, labels) {
     const isUser = message.role === "user";
     const roleLabel = isUser ? labels.user : labels.assistant;
+    const cleanHtml = sanitizeSerializedFragment(message.html);
+    const parts = isUser ? extractImagesFromHtml(cleanHtml) : { content: cleanHtml, media: "" };
+    const content = parts.content ? `<div class="message-content">${parts.content}</div>` : "";
+    const media = parts.media ? `<div class="message-media">${parts.media}</div>` : "";
     return `<article class="message message-${message.role}" aria-label="${escapeHtml(roleLabel)}">
       <div class="message-column">
         <div class="message-role">${escapeHtml(roleLabel)}</div>
-        <div class="message-content">${sanitizeSerializedFragment(message.html)}</div>
+        ${content}${media}
       </div>
     </article>`;
   }
@@ -475,7 +531,8 @@
     .message { display: block; }
     .message-user { display: flex; justify-content: flex-end; }
     .message-column { min-width: 0; width: 100%; }
-    .message-user .message-column { width: fit-content; max-width: min(70%, 620px); padding: 10px 16px; border-radius: 22px; background: var(--user); }
+    .message-user .message-column { display: flex; width: min(70%, 620px); max-width: 100%; flex-direction: column; align-items: flex-end; gap: 10px; }
+    .message-user .message-content { width: fit-content; max-width: 100%; padding: 10px 16px; border-radius: 22px; background: var(--user); }
     .message-role { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); clip-path: inset(50%); white-space: nowrap; }
     .message-content { overflow-wrap: anywhere; font-size: 16px; line-height: 1.72; }
     .message-content > :first-child { margin-top: 0; }
@@ -496,6 +553,8 @@
     .message-content th, .message-content td { border: 1px solid var(--border); padding: 8px 12px; text-align: left; vertical-align: top; }
     .message-content th { background: var(--code); font-weight: 650; }
     .message-content img { display: block; max-width: 100%; height: auto; margin: 1em 0; border-radius: 12px; }
+    .message-media { display: flex; max-width: 100%; flex-direction: column; align-items: flex-end; gap: 8px; background: transparent; }
+    .message-media img { display: block; max-width: 100%; height: auto; margin: 0; border: 0; border-radius: 12px; background: transparent; }
     .message-content details { margin: 1em 0; border: 1px solid var(--border); border-radius: 10px; padding: 10px 12px; }
     .message-content summary { cursor: pointer; font-weight: 650; }
     .message-content .katex-display { max-width: 100%; overflow-x: auto; overflow-y: hidden; }
@@ -505,7 +564,8 @@
       .header-inner { padding: 14px 0 12px; }
       main { padding-top: 26px; }
       .conversation { gap: 28px; }
-      .message-user .message-column { max-width: 88%; padding: 9px 14px; border-radius: 18px; }
+      .message-user .message-column { width: 88%; }
+      .message-user .message-content { padding: 9px 14px; border-radius: 18px; }
       .message-content { font-size: 15px; line-height: 1.65; }
       .message-content pre { margin-inline: -2px; padding: 13px; border-radius: 9px; }
     }
