@@ -10,7 +10,7 @@
   const MAX_HTML_BYTES = 20 * 1024 * 1024;
   const MAX_IMAGE_BYTES = 8 * 1024 * 1024;
   const DEPLOY_HOST = "ship.page";
-  const PUBLIC_HOST_SUFFIX = ".shipped.page";
+  const PUBLIC_HOST_SUFFIX = ".shipped.run";
 
   function byteLength(value) {
     return new TextEncoder().encode(String(value || "")).byteLength;
@@ -59,7 +59,7 @@
     }
 
     if (publicUrl.protocol !== "https:" || !publicUrl.hostname.endsWith(PUBLIC_HOST_SUFFIX)) {
-      throw new Error("Serwer zwrócił adres spoza zaufanej domeny shipped.page.");
+      throw new Error("Serwer zwrócił adres spoza zaufanej domeny shipped.run.");
     }
 
     return {
