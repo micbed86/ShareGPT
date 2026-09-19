@@ -10,15 +10,29 @@ test("asset allowlist is limited to OpenAI and ChatGPT HTTPS hosts", () => {
   assert.equal(core.isAllowedAssetUrl("https://example.com/file.png"), false);
 });
 
-test("deploy response accepts only shipped.page HTTPS URLs", () => {
+test("deploy response builds the canonical shipped.run URL from the drop slug", () => {
   const normalized = core.normalizeDeployResponse({
-    url: "https://quiet-river-c0ffee.shipped.page/",
+    url: "https://some-current-or-future-host.example/drop/quiet-river-c0ffee",
     slug: "quiet-river-c0ffee",
     expires_at: "2026-08-27T00:00:00.000Z"
   });
-  assert.equal(normalized.url, "https://quiet-river-c0ffee.shipped.page/");
-  assert.throws(() => core.normalizeDeployResponse({ url: "https://evil.example/" }), /zaufanej domeny/);
-  assert.throws(() => core.normalizeDeployResponse({}), /nie zwrócił adresu/);
+  assert.equal(normalized.url, "https://quiet-river-c0ffee.shipped.run/");
+  assert.equal(normalized.slug, "quiet-river-c0ffee");
+});
+
+test("legacy shipped.page responses are canonicalized to shipped.run", () => {
+  const normalized = core.normalizeDeployResponse({
+    url: "https://quiet-river-c0ffee.shipped.page/"
+  });
+  assert.equal(normalized.url, "https://quiet-river-c0ffee.shipped.run/");
+  assert.equal(normalized.slug, "quiet-river-c0ffee");
+});
+
+test("deploy response rejects missing or invalid drop identifiers", () => {
+  assert.throws(() => core.normalizeDeployResponse({ url: "https://evil.example/" }), /identyfikatora publikacji/);
+  assert.throws(() => core.normalizeDeployResponse({ slug: "../../evil" }), /identyfikatora publikacji/);
+  assert.throws(() => core.normalizeDeployResponse({}), /identyfikatora publikacji/);
+  assert.throws(() => core.normalizeDeployResponse(null), /nieprawidłową odpowiedź/);
 });
 
 test("trusted senders must be ChatGPT pages", () => {

@@ -38,6 +38,45 @@ test("buildHtml emits one responsive static document in the captured theme", () 
   assert.match(html, /noindex, nofollow/);
 });
 
+test("user images are rendered outside the colored text bubble", () => {
+  const html = exporter.buildHtml(snapshot({
+    messages: [{
+      role: "user",
+      html: "<p>Opis</p><img src=\"https://example.com/photo.png\" alt=\"photo\">",
+      markdown: "Opis"
+    }]
+  }));
+  assert.match(html, /<div class="message-content"><p>Opis<\/p><\/div><div class="message-media"><img/);
+  assert.match(html, /\.message-user \.message-content \{[^}]*background: var\(--user\)/);
+  assert.match(html, /\.message-media \{[^}]*background: transparent/);
+});
+
+test("image-only user messages do not emit an empty colored bubble", () => {
+  const html = exporter.buildHtml(snapshot({
+    messages: [{
+      role: "user",
+      html: "<img src=\"https://example.com/photo.png\" alt=\"photo\">",
+      markdown: "![photo](https://example.com/photo.png)"
+    }]
+  }));
+  const message = html.match(/<article class="message message-user"[\s\S]*?<\/article>/)[0];
+  assert.doesNotMatch(message, /class="message-content"/);
+  assert.match(message, /class="message-media"/);
+});
+
+test("citation markers stay compact and clickable with a tooltip", () => {
+  const html = exporter.buildHtml(snapshot({
+    messages: [{
+      role: "assistant",
+      html: "<p>Fakt<sup class=\"source-ref\"><a class=\"source-ref-link\" href=\"https://example.com/source\" title=\"Example — https://example.com/source\">1</a></sup>.</p>",
+      markdown: "Fakt."
+    }]
+  }));
+  assert.match(html, /class="source-ref-link"/);
+  assert.match(html, /title="Example — https:\/\/example\.com\/source"/);
+  assert.match(html, /\.source-ref-link \{/);
+});
+
 test("buildHtml strips active content as defense in depth", () => {
   const html = exporter.buildHtml(snapshot({
     messages: [{
