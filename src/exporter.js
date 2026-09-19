@@ -149,10 +149,16 @@
   function sourceContextDescriptor(element) {
     const parts = [];
     let current = element;
-    for (let depth = 0; current && depth < 6; depth += 1, current = current.parentElement) {
-      parts.push(elementDescriptor(current));
+    for (let depth = 0; current && depth < 5; depth += 1, current = current.parentElement) {
+      const attributes = [
+        current.getAttribute && current.getAttribute("aria-label") || "",
+        current.getAttribute && current.getAttribute("title") || "",
+        current.getAttribute && current.getAttribute("data-testid") || "",
+        current.getAttribute && current.getAttribute("class") || ""
+      ].join(" ");
+      parts.push(depth === 0 ? `${current.textContent || ""} ${attributes}` : attributes);
     }
-    return parts.join(" ");
+    return parts.join(" ").replace(/\s+/g, " ").trim();
   }
 
   function sourceIndexFromText(value) {
@@ -258,7 +264,7 @@
     for (let index = 0; index < Math.min(sourceControls.length, cloneControls.length); index += 1) {
       const original = sourceControls[index];
       const copy = cloneControls[index];
-      if (!copy || !copy.isConnected) continue;
+      if (!copy) continue;
 
       const descriptor = elementDescriptor(original);
       const citationLike = isSourceLikeElement(original)
