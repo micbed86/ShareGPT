@@ -127,46 +127,179 @@
     }
     const attrWidth = Number.parseFloat(image.getAttribute && image.getAttribute("width")) || 0;
     const attrHeight = Number.parseFloat(image.getAttribute && image.getAttribute("height")) || 0;
+    const naturalWidth = Number(image.naturalWidth || 0);
+    const naturalHeight = Number(image.naturalHeight || 0);
     return {
-      width: Math.max(rect && Number.isFinite(rect.width) ? rect.width : 0, attrWidth),
-      height: Math.max(rect && Number.isFinite(rect.height) ? rect.height : 0, attrHeight)
+      width: Math.max(rect && Number.isFinite(rect.width) ? rect.width : 0, attrWidth, naturalWidth),
+      height: Math.max(rect && Number.isFinite(rect.height) ? rect.height : 0, attrHeight, naturalHeight)
     };
+  }
+
+  function elementDescriptor(element) {
+    if (!element) return "";
+    return [
+      element.textContent || "",
+      element.getAttribute && element.getAttribute("aria-label") || "",
+      element.getAttribute && element.getAttribute("title") || "",
+      element.getAttribute && element.getAttribute("data-testid") || "",
+      element.getAttribute && element.getAttribute("class") || ""
+    ].join(" ").replace(/\s+/g, " ").trim();
+  }
+
+  function sourceContextDescriptor(element) {
+    const parts = [];
+    let current = element;
+    for (let depth = 0; current && depth < 6; depth += 1, current = current.parentElement) {
+      parts.push(elementDescriptor(current));
+    }
+    return parts.join(" ");
+  }
+
+  function sourceIndexFromText(value) {
+    const text = String(value || "");
+    let match = text.match(/†\s*(\d{1,2})/);
+    if (match) return Number(match[1]);
+    match = text.match(/(?:citation|source|reference|cytat|źród(?:ło|ła|le|łem|łach)?)\D{0,12}(\d{1,2})/i);
+    if (match) return Number(match[1]);
+    const compact = text.trim();
+    return /^\d{1,2}$/.test(compact) ? Number(compact) : 0;
+  }
+
+  function isSourceLikeElement(element) {
+    const descriptor = sourceContextDescriptor(element);
+    return /(?:citation|source|reference|cytat|źród(?:ło|ła|le|łem|łach)?)/i.test(descriptor)
+      || /†\s*\d{1,2}/.test(descriptor);
+  }
+
+  function externalLinkFor(element) {
+    const anchor = element && element.closest ? element.closest("a[href]") : null;
+    if (!anchor) return null;
+    const href = anchor.href || anchor.getAttribute("href");
+    if (!isSafeUrl(href, "link")) return null;
+    try {
+      const url = new URL(href, "https://chatgpt.com/");
+      if (url.protocol !== "http:" && url.protocol !== "https:") return null;
+      if (url.hostname === "chatgpt.com" || url.hostname.endsWith(".chatgpt.com")) return null;
+      return anchor;
+    } catch (_error) {
+      return null;
+    }
   }
 
   function isLikelyConversationImage(image) {
     if (!image || String(image.tagName || "").toUpperCase() !== "IMG") return false;
-    if (image.closest && image.closest("[data-testid*='attachment'], [data-testid*='file']")) return true;
+
+    const attachment = image.closest && image.closest("[data-testid*='attachment'], [data-testid*='file']");
+    if (attachment) return true;
+
+    if (isSourceLikeElement(image)) return false;
+    if (externalLinkFor(image)) return false;
 
     const { width, height } = renderedImageSize(image);
-    if (width >= 96 || height >= 96) return true;
+    if (width >= 128 || height >= 128) return true;
 
     const alt = String(image.getAttribute && image.getAttribute("alt") || "").trim();
-    const insideExternalLink = !!(image.closest && image.closest("a[href^='http://'], a[href^='https://']"));
-    if (!insideExternalLink && /(?:uploaded|attachment|generated|photo|image|obraz|zdj[eę]cie|grafik)/i.test(alt)) return true;
+    if (/(?:uploaded|attachment|generated|photo|image|obraz|zdj[eę]cie|grafik|screenshot|zrzut)/i.test(alt)) return true;
 
-    return false;
+    const src = String(image.currentSrc || image.src || image.getAttribute && image.getAttribute("src") || "");
+    return /(?:oaiusercontent\.com|chatgpt\.com\/backend-api\/files)/i.test(src) && (width >= 64 || height >= 64);
   }
 
   function contentForRole(roleNode) {
     const role = roleNode.getAttribute("data-message-author-role");
     if (role === "assistant") {
-      const markdown = roleNode.querySelector(".markdown, [class*='markdown']");
-      const meaningfulImage = [...roleNode.querySelectorAll("img")].find((image) => isLikelyConversationImage(image));
-      const extraMedia = meaningfulImage || roleNode.querySelector("[data-testid*='file'], [data-testid*='attachment']");
-      return markdown && extraMedia && !markdown.contains(extraMedia) ? roleNode : (markdown || roleNode);
+      return roleNode.querySelector(".markdown, [class*='markdown']") || roleNode;
     }
-    const text = roleNode.querySelector("[class*='whitespace-pre-wrap'], .markdown, [class*='markdown']");
-    const meaningfulImage = [...roleNode.querySelectorAll("img")].find((image) => isLikelyConversationImage(image));
-    const extraMedia = meaningfulImage || roleNode.querySelector("[data-testid*='file'], [data-testid*='attachment']");
-    return text && extraMedia && !text.contains(extraMedia) ? roleNode : (text || roleNode);
+    return roleNode.querySelector("[class*='whitespace-pre-wrap'], .markdown, [class*='markdown']") || roleNode;
+  }
+
+  function sourceLinksForRole(roleNode) {
+    const sources = [];
+    const seen = new Set();
+    for (const anchor of roleNode.querySelectorAll("a[href]")) {
+      const href = anchor.href || anchor.getAttribute("href");
+      if (!isSafeUrl(href, "link")) continue;
+      let url;
+      try {
+        url = new URL(href, "https://chatgpt.com/");
+      } catch (_error) {
+        continue;
+      }
+      if (!["http:", "https:"].includes(url.protocol)) continue;
+      if (url.hostname === "chatgpt.com" || url.hostname.endsWith(".chatgpt.com")) continue;
+
+      const descriptor = sourceContextDescriptor(anchor);
+      const index = sourceIndexFromText(descriptor);
+      if (!index && !isSourceLikeElement(anchor)) continue;
+      if (seen.has(url.href)) continue;
+      seen.add(url.href);
+
+      const visible = String(anchor.textContent || "").replace(/†\s*\d{1,2}/g, "").replace(/\s+/g, " ").trim();
+      const title = visible
+        || String(anchor.getAttribute("aria-label") || anchor.getAttribute("title") || "").replace(/\s+/g, " ").trim()
+        || url.hostname.replace(/^www\./, "");
+      sources.push({ href: url.href, title, index });
+    }
+    return sources;
+  }
+
+  function preserveCitationControls(source, clone, roleNode) {
+    const sources = sourceLinksForRole(roleNode);
+    if (!sources.length) return;
+
+    const sourceControls = source.tagName === "A" || source.tagName === "BUTTON"
+      ? [source, ...source.querySelectorAll("a, button")]
+      : [...source.querySelectorAll("a, button")];
+    const cloneControls = clone.tagName === "A" || clone.tagName === "BUTTON"
+      ? [clone, ...clone.querySelectorAll("a, button")]
+      : [...clone.querySelectorAll("a, button")];
+
+    let fallbackIndex = 0;
+    for (let index = 0; index < Math.min(sourceControls.length, cloneControls.length); index += 1) {
+      const original = sourceControls[index];
+      const copy = cloneControls[index];
+      if (!copy || !copy.isConnected) continue;
+
+      const descriptor = elementDescriptor(original);
+      const citationLike = isSourceLikeElement(original)
+        || /†\s*\d{1,2}/.test(descriptor)
+        || (original.tagName === "BUTTON" && /^\s*\d{1,2}\s*$/.test(original.textContent || ""));
+      if (!citationLike) continue;
+
+      const explicitIndex = sourceIndexFromText(descriptor);
+      let sourceEntry = explicitIndex ? sources.find((entry) => entry.index === explicitIndex) : null;
+
+      const directHref = original.tagName === "A" ? (original.href || original.getAttribute("href")) : "";
+      if (!sourceEntry && isSafeUrl(directHref, "link")) {
+        sourceEntry = sources.find((entry) => entry.href === new URL(directHref, "https://chatgpt.com/").href) || null;
+      }
+      if (!sourceEntry) sourceEntry = sources[fallbackIndex] || null;
+      if (!sourceEntry) {
+        copy.remove();
+        continue;
+      }
+
+      fallbackIndex = Math.min(sources.length, fallbackIndex + 1);
+      const markerIndex = explicitIndex || sourceEntry.index || fallbackIndex;
+      const sup = clone.ownerDocument.createElement("sup");
+      sup.setAttribute("class", "source-ref");
+      const link = clone.ownerDocument.createElement("a");
+      link.setAttribute("class", "source-ref-link");
+      link.setAttribute("href", sourceEntry.href);
+      link.setAttribute("title", sourceEntry.title + " — " + sourceEntry.href);
+      link.setAttribute("aria-label", "Źródło " + markerIndex + ": " + sourceEntry.title);
+      link.textContent = String(markerIndex);
+      sup.append(link);
+      copy.replaceWith(sup);
+    }
   }
 
   function safeClassNames(element) {
     const tokens = String(element.getAttribute("class") || "").split(/\s+/);
-    return tokens.filter((token) => /^(?:katex(?:-[a-z]+)?|hljs|language-[a-z0-9_-]+)$/i.test(token)).join(" ");
+    return tokens.filter((token) => /^(?:katex(?:-[a-z]+)?|hljs|language-[a-z0-9_-]+|source-ref|source-ref-link)$/i.test(token)).join(" ");
   }
 
-  function sanitizeClone(source) {
+  function sanitizeClone(source, roleNode = source) {
     const sourceImages = source.tagName === "IMG" ? [source] : [...source.querySelectorAll("img")];
     const clone = source.cloneNode(true);
     const cloneImages = clone.tagName === "IMG" ? [clone] : [...clone.querySelectorAll("img")];
@@ -174,6 +307,8 @@
     for (let index = 0; index < cloneImages.length; index += 1) {
       if (!isLikelyConversationImage(sourceImages[index])) cloneImages[index].remove();
     }
+
+    preserveCitationControls(source, clone, roleNode);
 
     const preformattedBlocks = clone.tagName === "PRE" ? [clone] : [...clone.querySelectorAll("pre")];
     for (const pre of preformattedBlocks) {
@@ -189,11 +324,6 @@
         code.textContent = visualLines.map((line) => line.textContent).join("\n");
         pre.replaceChildren(code);
       }
-    }
-
-    for (const button of clone.querySelectorAll("button")) {
-      const meaningfulImages = [...button.querySelectorAll("img")].map((image) => image.cloneNode(true));
-      if (meaningfulImages.length) button.replaceWith(...meaningfulImages);
     }
 
     for (const blocked of clone.querySelectorAll(BLOCKED_SELECTOR)) {
@@ -225,7 +355,9 @@
         else {
           element.setAttribute("href", href);
           element.setAttribute("target", "_blank");
-          element.setAttribute("rel", "noopener noreferrer nofollow");
+          element.setAttribute("rel", element.classList.contains("source-ref-link")
+            ? "cite noopener noreferrer nofollow"
+            : "noopener noreferrer nofollow");
         }
       }
 
@@ -399,18 +531,46 @@
     }
   }
 
+  async function captureExtraMedia(roleNode, content, inlineAsset) {
+    const seen = new Set();
+    const htmlParts = [];
+    const markdownParts = [];
+    for (const image of roleNode.querySelectorAll("img")) {
+      if (!isLikelyConversationImage(image)) continue;
+      if (content && content.contains && content.contains(image)) continue;
+
+      const src = String(image.currentSrc || image.src || image.getAttribute("src") || "");
+      if (src && seen.has(src)) continue;
+      if (src) seen.add(src);
+
+      const clone = sanitizeClone(image, roleNode);
+      await inlineImages(clone, inlineAsset);
+      const html = sanitizeSerializedFragment(clone.outerHTML || "");
+      if (html) htmlParts.push(html);
+      const markdown = normalizeMarkdown(nodeToMarkdown(clone));
+      if (markdown) markdownParts.push(markdown);
+    }
+    return {
+      html: htmlParts.join(""),
+      markdown: markdownParts.join("\n\n")
+    };
+  }
+
   async function captureMessage(roleNode, turn, options) {
     const role = roleNode.getAttribute("data-message-author-role") === "user" ? "user" : "assistant";
     const content = contentForRole(roleNode);
-    const clone = sanitizeClone(content);
+    const clone = sanitizeClone(content, roleNode);
     await inlineImages(clone, options.inlineAsset);
+    const media = await captureExtraMedia(roleNode, content, options.inlineAsset);
     const html = sanitizeSerializedFragment(clone.innerHTML || clone.outerHTML || "");
-    const markdown = normalizeMarkdown(nodeToMarkdown(clone));
+    const contentMarkdown = normalizeMarkdown(nodeToMarkdown(clone));
+    const markdown = normalizeMarkdown([contentMarkdown, media.markdown].filter(Boolean).join("\n\n"));
 
     return {
       id: roleNode.getAttribute("data-message-id") || turn.getAttribute("data-testid") || "",
       role,
       html,
+      mediaHtml: media.html,
       markdown: markdown || String(content.innerText || content.textContent || "").trim()
     };
   }
@@ -471,13 +631,29 @@
     return { content, media: images.join("") };
   }
 
+  function extractImagesFromHtml(html) {
+    const images = [];
+    let content = String(html || "").replace(/<img\b[^>]*>/gi, (image) => {
+      images.push(image);
+      return "";
+    });
+    content = content
+      .replace(/<a\b[^>]*>\s*<\/a>/gi, "")
+      .replace(/<(?:div|span|p)\b[^>]*>\s*<\/(?:div|span|p)>/gi, "")
+      .trim();
+    const textOnly = content.replace(/<[^>]+>/g, "").replace(/&nbsp;/gi, " ").trim();
+    if (!textOnly && !/<(?:pre|code|table|ul|ol|blockquote|details|hr)\b/i.test(content)) content = "";
+    return { content, media: images.join("") };
+  }
+
   function messageHtml(message, labels) {
     const isUser = message.role === "user";
     const roleLabel = isUser ? labels.user : labels.assistant;
     const cleanHtml = sanitizeSerializedFragment(message.html);
-    const parts = isUser ? extractImagesFromHtml(cleanHtml) : { content: cleanHtml, media: "" };
-    const content = parts.content ? `<div class="message-content">${parts.content}</div>` : "";
-    const media = parts.media ? `<div class="message-media">${parts.media}</div>` : "";
+    const extracted = isUser ? extractImagesFromHtml(cleanHtml) : { content: cleanHtml, media: "" };
+    const content = extracted.content ? `<div class="message-content">${extracted.content}</div>` : "";
+    const mediaHtml = sanitizeSerializedFragment([extracted.media, message.mediaHtml || ""].filter(Boolean).join(""));
+    const media = mediaHtml ? `<div class="message-media">${mediaHtml}</div>` : "";
     return `<article class="message message-${message.role}" aria-label="${escapeHtml(roleLabel)}">
       <div class="message-column">
         <div class="message-role">${escapeHtml(roleLabel)}</div>
@@ -520,55 +696,87 @@
       --link: ${theme.mode === "dark" ? "#7ab7ff" : "#005bd1"};
     }
     * { box-sizing: border-box; }
+    html, body { max-width: 100%; overflow-x: hidden; }
     html { background: var(--page); color: var(--text); font-family: ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
     body { margin: 0; min-height: 100dvh; background: var(--page); color: var(--text); }
-    .page-header { position: sticky; top: 0; z-index: 2; border-bottom: 1px solid var(--border); background: var(--page); }
-    .header-inner { width: min(100% - 40px, 860px); margin: 0 auto; padding: 18px 0 16px; }
-    .eyebrow { margin: 0 0 6px; color: var(--muted); font-size: 12px; font-weight: 600; letter-spacing: .02em; }
-    h1 { margin: 0; font-size: clamp(18px, 3vw, 24px); font-weight: 650; line-height: 1.25; letter-spacing: -.02em; }
-    main { width: min(100% - 40px, 820px); margin: 0 auto; padding: 38px 0 64px; }
-    .conversation { display: grid; gap: 34px; }
-    .message { display: block; }
+    .page-header { border-bottom: 1px solid var(--border); background: var(--page); }
+    .header-inner, main, footer {
+      width: 100%;
+      max-width: 100%;
+      margin: 0;
+      padding-left: max(14px, env(safe-area-inset-left));
+      padding-right: max(14px, env(safe-area-inset-right));
+    }
+    .header-inner { padding-top: 14px; padding-bottom: 12px; }
+    .eyebrow { margin: 0 0 5px; color: var(--muted); font-size: 11px; font-weight: 600; letter-spacing: .02em; }
+    h1 { margin: 0; font-size: clamp(17px, 5vw, 22px); font-weight: 650; line-height: 1.25; letter-spacing: -.02em; overflow-wrap: anywhere; }
+    main { padding-top: 24px; padding-bottom: 48px; }
+    .conversation { display: grid; min-width: 0; gap: 28px; }
+    .message { display: block; min-width: 0; max-width: 100%; }
     .message-user { display: flex; justify-content: flex-end; }
-    .message-column { min-width: 0; width: 100%; }
-    .message-user .message-column { display: flex; width: min(70%, 620px); max-width: 100%; flex-direction: column; align-items: flex-end; gap: 10px; }
-    .message-user .message-content { width: fit-content; max-width: 100%; padding: 10px 16px; border-radius: 22px; background: var(--user); }
+    .message-column { min-width: 0; width: 100%; max-width: 100%; }
+    .message-user .message-column { display: flex; width: min(92%, 38rem); max-width: 100%; flex-direction: column; align-items: flex-end; gap: 8px; }
+    .message-user .message-content { width: fit-content; max-width: 100%; padding: 9px 13px; border-radius: 18px; background: var(--user); }
     .message-role { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); clip-path: inset(50%); white-space: nowrap; }
-    .message-content { overflow-wrap: anywhere; font-size: 16px; line-height: 1.72; }
+    .message-content { min-width: 0; max-width: 100%; overflow-wrap: anywhere; word-break: normal; font-size: 15px; line-height: 1.62; }
     .message-content > :first-child { margin-top: 0; }
     .message-content > :last-child { margin-bottom: 0; }
-    .message-content p { margin: 0 0 1em; }
-    .message-content h1, .message-content h2, .message-content h3, .message-content h4 { margin: 1.45em 0 .55em; line-height: 1.25; letter-spacing: -.015em; }
-    .message-content h1 { font-size: 1.5em; }
-    .message-content h2 { font-size: 1.32em; }
-    .message-content h3 { font-size: 1.16em; }
-    .message-content ul, .message-content ol { margin: .8em 0 1em; padding-left: 1.5em; }
-    .message-content li { margin: .32em 0; }
-    .message-content blockquote { margin: 1em 0; padding-left: 1em; border-left: 3px solid var(--border); color: var(--muted); }
-    .message-content a { color: var(--link); text-decoration: underline; text-underline-offset: 2px; }
-    .message-content code { border-radius: 5px; background: var(--code); padding: .14em .34em; font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: .9em; }
-    .message-content pre { max-width: 100%; margin: 1em 0; overflow: auto; border: 1px solid var(--border); border-radius: 10px; background: var(--code); padding: 16px; line-height: 1.55; }
-    .message-content pre code { display: block; min-width: max-content; padding: 0; background: transparent; white-space: pre; }
-    .message-content table { display: block; width: max-content; max-width: 100%; margin: 1em 0; overflow-x: auto; border-collapse: collapse; }
-    .message-content th, .message-content td { border: 1px solid var(--border); padding: 8px 12px; text-align: left; vertical-align: top; }
+    .message-content p { margin: 0 0 .9em; }
+    .message-content h1, .message-content h2, .message-content h3, .message-content h4 { margin: 1.35em 0 .5em; line-height: 1.25; letter-spacing: -.015em; }
+    .message-content h1 { font-size: 1.45em; }
+    .message-content h2 { font-size: 1.28em; }
+    .message-content h3 { font-size: 1.14em; }
+    .message-content ul, .message-content ol { margin: .75em 0 .9em; padding-left: 1.35em; }
+    .message-content li { margin: .3em 0; }
+    .message-content blockquote { margin: .9em 0; padding-left: .9em; border-left: 3px solid var(--border); color: var(--muted); }
+    .message-content a { color: var(--link); text-decoration: underline; text-underline-offset: 2px; overflow-wrap: anywhere; }
+    .source-ref { display: inline; margin-left: .18em; font-size: .72em; line-height: 0; vertical-align: super; }
+    .source-ref-link {
+      display: inline-grid;
+      min-width: 1.45em;
+      height: 1.45em;
+      place-items: center;
+      padding: 0 .32em;
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      background: var(--code);
+      color: var(--muted) !important;
+      text-decoration: none !important;
+      font-size: 10px;
+      font-weight: 700;
+      line-height: 1;
+    }
+    .source-ref-link:hover, .source-ref-link:focus-visible { color: var(--text) !important; border-color: currentColor; }
+    .message-content code { border-radius: 5px; background: var(--code); padding: .14em .34em; font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: .9em; overflow-wrap: anywhere; }
+    .message-content pre { width: 100%; max-width: 100%; margin: .9em 0; overflow-x: auto; -webkit-overflow-scrolling: touch; border: 1px solid var(--border); border-radius: 9px; background: var(--code); padding: 12px; line-height: 1.5; }
+    .message-content pre code { display: block; min-width: max-content; padding: 0; background: transparent; white-space: pre; overflow-wrap: normal; }
+    .message-content table { display: block; width: 100%; max-width: 100%; margin: .9em 0; overflow-x: auto; -webkit-overflow-scrolling: touch; border-collapse: collapse; }
+    .message-content th, .message-content td { border: 1px solid var(--border); padding: 7px 9px; text-align: left; vertical-align: top; white-space: normal; }
     .message-content th { background: var(--code); font-weight: 650; }
-    .message-content img { display: block; max-width: 100%; height: auto; margin: 1em 0; border-radius: 12px; }
-    .message-media { display: flex; max-width: 100%; flex-direction: column; align-items: flex-end; gap: 8px; background: transparent; }
-    .message-media img { display: block; max-width: 100%; height: auto; margin: 0; border: 0; border-radius: 12px; background: transparent; }
-    .message-content details { margin: 1em 0; border: 1px solid var(--border); border-radius: 10px; padding: 10px 12px; }
+    .message-content img { display: block; max-width: 100%; height: auto; margin: .9em 0; border-radius: 10px; }
+    .message-media { display: flex; width: 100%; max-width: 100%; flex-direction: column; align-items: flex-end; gap: 8px; background: transparent; }
+    .message-media img { display: block; width: auto; max-width: 100%; height: auto; margin: 0; border: 0; border-radius: 10px; background: transparent; }
+    .message-content details { margin: .9em 0; border: 1px solid var(--border); border-radius: 9px; padding: 9px 10px; }
     .message-content summary { cursor: pointer; font-weight: 650; }
     .message-content .katex-display { max-width: 100%; overflow-x: auto; overflow-y: hidden; }
-    footer { width: min(100% - 40px, 820px); margin: 0 auto; padding: 0 0 32px; color: var(--muted); font-size: 12px; }
-    @media (max-width: 640px) {
-      .header-inner, main, footer { width: min(100% - 28px, 820px); }
-      .header-inner { padding: 14px 0 12px; }
-      main { padding-top: 26px; }
-      .conversation { gap: 28px; }
-      .message-user .message-column { width: 88%; }
-      .message-user .message-content { padding: 9px 14px; border-radius: 18px; }
-      .message-content { font-size: 15px; line-height: 1.65; }
-      .message-content pre { margin-inline: -2px; padding: 13px; border-radius: 9px; }
+    footer { padding-top: 0; padding-bottom: max(24px, env(safe-area-inset-bottom)); color: var(--muted); font-size: 11px; }
+
+    @media (min-width: 641px) {
+      .page-header { position: sticky; top: 0; z-index: 2; }
+      .header-inner { width: min(calc(100% - 40px), 860px); margin: 0 auto; padding: 18px 0 16px; }
+      .eyebrow { margin-bottom: 6px; font-size: 12px; }
+      h1 { font-size: clamp(18px, 3vw, 24px); }
+      main { width: min(calc(100% - 40px), 820px); margin: 0 auto; padding: 38px 0 64px; }
+      .conversation { gap: 34px; }
+      .message-user .message-column { width: min(70%, 620px); gap: 10px; }
+      .message-user .message-content { padding: 10px 16px; border-radius: 22px; }
+      .message-content { font-size: 16px; line-height: 1.72; }
+      .message-content pre { padding: 16px; border-radius: 10px; }
+      .message-content th, .message-content td { padding: 8px 12px; }
+      .message-content img, .message-media img { border-radius: 12px; }
+      footer { width: min(calc(100% - 40px), 820px); margin: 0 auto; padding: 0 0 32px; }
     }
+
     @media print {
       .page-header { position: static; }
       main { width: 100%; }
