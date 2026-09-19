@@ -64,6 +64,19 @@ test("image-only user messages do not emit an empty colored bubble", () => {
   assert.match(message, /class="message-media"/);
 });
 
+test("citation markers stay compact and clickable with a tooltip", () => {
+  const html = exporter.buildHtml(snapshot({
+    messages: [{
+      role: "assistant",
+      html: "<p>Fakt<sup class=\"source-ref\"><a class=\"source-ref-link\" href=\"https://example.com/source\" title=\"Example — https://example.com/source\">1</a></sup>.</p>",
+      markdown: "Fakt."
+    }]
+  }));
+  assert.match(html, /class="source-ref-link"/);
+  assert.match(html, /title="Example — https:\/\/example\.com\/source"/);
+  assert.match(html, /\.source-ref-link \{/);
+});
+
 test("buildHtml strips active content as defense in depth", () => {
   const html = exporter.buildHtml(snapshot({
     messages: [{
