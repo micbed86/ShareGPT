@@ -127,11 +127,9 @@
     }
     const attrWidth = Number.parseFloat(image.getAttribute && image.getAttribute("width")) || 0;
     const attrHeight = Number.parseFloat(image.getAttribute && image.getAttribute("height")) || 0;
-    const naturalWidth = Number(image.naturalWidth || 0);
-    const naturalHeight = Number(image.naturalHeight || 0);
     return {
-      width: Math.max(rect && Number.isFinite(rect.width) ? rect.width : 0, attrWidth, naturalWidth),
-      height: Math.max(rect && Number.isFinite(rect.height) ? rect.height : 0, attrHeight, naturalHeight)
+      width: Math.max(rect && Number.isFinite(rect.width) ? rect.width : 0, attrWidth),
+      height: Math.max(rect && Number.isFinite(rect.height) ? rect.height : 0, attrHeight)
     };
   }
 
@@ -156,7 +154,9 @@
         current.getAttribute && current.getAttribute("data-testid") || "",
         current.getAttribute && current.getAttribute("class") || ""
       ].join(" ");
-      parts.push(depth === 0 ? `${current.textContent || ""} ${attributes}` : attributes);
+      const text = String(current.textContent || "").replace(/\s+/g, " ").trim();
+      const localText = depth === 0 || text.length <= 160 ? text : "";
+      parts.push(`${localText} ${attributes}`);
     }
     return parts.join(" ").replace(/\s+/g, " ").trim();
   }
@@ -620,21 +620,6 @@
       },
       messages
     };
-  }
-
-  function extractImagesFromHtml(html) {
-    const images = [];
-    let content = String(html || "").replace(/<img\b[^>]*>/gi, (image) => {
-      images.push(image);
-      return "";
-    });
-    content = content
-      .replace(/<a\b[^>]*>\s*<\/a>/gi, "")
-      .replace(/<(?:div|span|p)\b[^>]*>\s*<\/(?:div|span|p)>/gi, "")
-      .trim();
-    const textOnly = content.replace(/<[^>]+>/g, "").replace(/&nbsp;/gi, " ").trim();
-    if (!textOnly && !/<(?:pre|code|table|ul|ol|blockquote|details|hr)\b/i.test(content)) content = "";
-    return { content, media: images.join("") };
   }
 
   function extractImagesFromHtml(html) {
